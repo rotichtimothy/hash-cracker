@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔓 Hash Cracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔓 Hash Cracker</h1>
+            <p class="subtitle">Educational tool to demonstrate hashing weaknesses</p>
+        </header>
+
+        <!-- Hash Generator -->
+        <div class="card">
+            <h3>🔧 Generate a Hash (for testing)</h3>
+            <input type="text" id="plainText" placeholder="Enter text to hash...">
+            <div class="row">
+                <select id="hashAlgo">
+                    <option value="md5">MD5</option>
+                    <option value="sha1">SHA1</option>
+                    <option value="sha256">SHA256</option>
+                </select>
+                <button onclick="generateHash()">Generate Hash</button>
+            </div>
+            <p id="hashResult" class="result-text"></p>
+        </div>
+
+        <!-- Hash Cracker -->
+        <div class="card">
+            <h3>🔍 Crack a Hash</h3>
+            <input type="text" id="targetHash" placeholder="Paste hash here...">
+
+            <div class="row">
+                <select id="method" onchange="toggleBruteOptions()">
+                    <option value="dictionary">📖 Dictionary Attack</option>
+                    <option value="brute">🔨 Brute Force</option>
+                </select>
+            </div>
+
+            <div id="bruteOptions" class="brute-options" style="display:none;">
+                <label>Charset:
+                    <select id="charset">
+                        <option value="lower">a-z</option>
+                        <option value="upper">A-Z</option>
+                        <option value="digits">0-9</option>
+                        <option value="alnum">a-z, A-Z, 0-9</option>
+                        <option value="all">All printable</option>
+                    </select>
+                </label>
+                <label>Max Length:
+                    <input type="number" id="maxLen" value="4" min="1" max="6">
+                </label>
+            </div>
+
+            <button onclick="crackHash()" class="primary">🚀 Crack It!</button>
+            <div id="result" class="result-box"></div>
+        </div>
+
+        <footer>
+            <p>⚠️ For educational use only. Don't crack hashes you don't own.</p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleBruteOptions() {
+            const method = document.getElementById('method').value;
+            document.getElementById('bruteOptions').style.display =
+                method === 'brute' ? 'flex' : 'none';
+        }
+
+        async function generateHash() {
+            const word = document.getElementById('plainText').value.trim();
+            const algo = document.getElementById('hashAlgo').value;
+            const resultEl = document.getElementById('hashResult');
+
+            if (!word) {
+                resultEl.innerText = '⚠️ Please enter some text first.';
+                return;
+            }
+
+            try {
+                const res = await fetch('/hash', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word, algo })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    resultEl.innerText = `❌ ${data.error}`;
+                } else {
+                    resultEl.innerHTML = `<b>${data.algo.toUpperCase()}:</b> <code>${data.hash}</code>`;
+                }
+            } catch (err) {
+                resultEl.innerText = `❌ Error: ${err.message}`;
+            }
+        }
+
+        async function crackHash() {
+            const resultDiv = document.getElementById('result');
+            const targetHash = document.getElementById('targetHash').value.trim();
+
+            if (!targetHash) {
+                resultDiv.innerHTML = '⚠️ Please enter a hash to crack.';
+                return;
+            }
+
+            resultDiv.innerHTML = '⏳ Cracking... please wait.';
+
+            const body = {
+                hash: targetHash,
+                method: document.getElementById('method').value,
+                charset: document.getElementById('charset').value,
+                max_length: document.getElementById('maxLen').value
+            };
+
+            try {
+                const res = await fetch('/crack', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ <b>Cracked!</b><br>
+                            Password: <code>${data.password}</code><br>
+                            Algorithm: <b>${data.algo.toUpperCase()}</b><br>
+                            Method: ${data.method}<br>
+                            Attempts: ${data.attempts.toLocaleString()}<br>
+                            Time: ${data.time}s
+                        </div>`;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="failure">
+                            ❌ <b>Not cracked.</b><br>
+                            ${data.error || ''}<br>
+                            Attempts: ${(data.attempts || 0).toLocaleString()}<br>
+                            Time: ${data.time || 0}s
+                        </div>`;
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
